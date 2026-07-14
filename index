@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Smith Chart — Impedance Mapped Onto a Circle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0B0E0D;
+    --panel: #121815;
+    --panel-2: #161D19;
+    --panel-border: #263029;
+    --grid: #33443D;
+    --grid-dim: #223029;
+    --amber: #FFB627;
+    --amber-dim: #8A6A2C;
+    --teal: #4DD9C0;
+    --paper: #E8E4DA;
+    --paper-dim: #93A099;
+    --warn: #FF6B5E;
+    --radius: 10px;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(255,182,39,0.06), transparent 60%),
+      radial-gradient(ellipse 900px 600px at 90% 10%, rgba(77,217,192,0.05), transparent 60%),
+      var(--bg);
+    color:var(--paper);
+    font-family:'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  ::selection{ background:var(--amber); color:#111; }
+
+  a{ color:var(--teal); }
+
+  :focus-visible{
+    outline:2px solid var(--teal);
+    outline-offset:3px;
+  }
+
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  h1,h2,h3{
+    font-family:'Barlow Condensed', sans-serif;
+    text-transform:uppercase;
+    letter-spacing:0.02em;
+    margin:0;
+    color:var(--paper);
+  }
+
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.72rem;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--amber);
+    display:flex;
+    align-items:center;
+    gap:0.6em;
+  }
+  .eyebrow::before{
+    content:"";
+    width:18px; height:1px;
+    background:var(--amber-dim);
+    display:inline-block;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:50;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 28px;
+    background:rgba(11,14,13,0.86);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--panel-border);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.74rem;
+    letter-spacing:0.08em;
+  }
+  .topbar .mark{ color:var(--paper); letter-spacing:0.14em; }
+  .topbar .mark b{ color:var(--amber); }
+  .topbar nav{ display:flex; gap:22px; }
+  .topbar nav a{
+    color:var(--paper-dim);
+    text-decoration:none;
+    text-transform:uppercase;
+  }
+  .topbar nav a:hover{ color:var(--teal); }
+  @media (max-width:640px){ .topbar nav{ display:none; } }
+
+  section{ padding:80px 28px; max-width:1180px; margin:0 auto; }
+
+  /* ---------- hero ---------- */
+  .hero{ padding-top:56px; }
+  .hero h1{
+    font-size:clamp(2.4rem, 5.6vw, 4.4rem);
+    line-height:0.98;
+    margin:18px 0 20px;
+    max-width:14ch;
+  }
+  .hero h1 em{ color:var(--amber); font-style:normal; }
+  .hero p.lede{
+    max-width:56ch;
+    color:var(--paper-dim);
+    font-size:1.05rem;
+    line-height:1.6;
+    margin:0 0 44px;
+  }
+
+  .rig{
+    display:grid;
+    grid-template-columns:1.15fr 0.85fr;
+    gap:22px;
+    align-items:start;
+  }
+  @media (max-width:900px){ .rig{ grid-template-columns:1fr; } }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:var(--radius);
+    padding:20px;
+    position:relative;
+  }
+  .panel::before{
+    content:attr(data-tag);
+    position:absolute; top:-1px; left:16px;
+    background:var(--amber);
+    color:#14100a;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.62rem;
+    font-weight:600;
+    letter-spacing:0.1em;
+    padding:3px 8px;
+    border-radius:0 0 4px 4px;
+  }
+
+  .chart-wrap{ padding-top:24px; }
+  .chart-caption{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-top:10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.68rem;
+    color:var(--paper-dim);
+    letter-spacing:0.04em;
+  }
+  .chart-caption b{ color:var(--paper); }
+
+  svg{ display:block; width:100%; height:auto; touch-action:none; }
+
+  .grid-line{ fill:none; stroke:var(--grid); stroke-width:1; }
+  .grid-line.dim{ stroke:var(--grid-dim); }
+  .axis-line{ stroke:var(--grid); stroke-width:1; }
+  .boundary{ fill:none; stroke:var(--paper-dim); stroke-width:1.4; }
+  .r1-circle{ fill:none; stroke:var(--amber-dim); stroke-width:1.1; }
+  .axis-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9.5px;
+    fill:var(--paper-dim);
+  }
+  .end-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9.5px;
+    letter-spacing:0.06em;
+    fill:var(--paper-dim);
+  }
+
+  .point-halo{ fill:none; stroke:var(--teal); stroke-width:1; opacity:0.35; }
+  .point{ fill:var(--teal); cursor:grab; }
+  .point:active{ cursor:grabbing; }
+  .center-mark{ fill:none; stroke:var(--teal); stroke-width:1.2; opacity:0.7; }
+
+  /* ---------- readout panel ---------- */
+  .readout{ padding-top:24px; height:100%; display:flex; flex-direction:column; }
+  .readout .status{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.72rem;
+    letter-spacing:0.1em;
+    color:var(--teal);
+    padding:6px 10px;
+    border:1px solid var(--panel-border);
+    border-radius:5px;
+    display:inline-block;
+    margin-bottom:18px;
+    width:fit-content;
+  }
+  .readout .status.warn{ color:var(--warn); }
+  .readout dl{
+    display:grid;
+    grid-template-columns:auto 1fr;
+    row-gap:14px; column-gap:14px;
+    margin:0 0 22px;
+  }
+  .readout dt{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.78rem;
+    color:var(--paper-dim);
+    align-self:center;
+  }
+  .readout dd{
+    margin:0;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:1.28rem;
+    color:var(--paper);
+    align-self:center;
+  }
+  .readout dd.hl{ color:var(--amber); }
+  .readout .hint{
+    margin-top:auto;
+    font-size:0.82rem;
+    color:var(--paper-dim);
+    line-height:1.55;
+    border-top:1px solid var(--panel-border);
+    padding-top:16px;
+  }
+
+  /* ---------- generic sections ---------- */
+  .section-head{ margin-bottom:36px; max-width:60ch; }
+  .section-head h2{ font-size:clamp(1.8rem, 3.4vw, 2.6rem); margin-top:14px; }
+  .section-head p{ color:var(--paper-dim); line-height:1.6; margin-top:12px; }
+
+  .prose{ max-width:66ch; color:var(--paper-dim); line-height:1.75; font-size:1rem; }
+  .prose strong{ color:var(--paper); font-weight:600; }
+
+  .cards{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  @media (max-width:760px){ .cards{ grid-template-columns:1fr; } }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:var(--radius);
+    padding:22px;
+  }
+  .card .k{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.7rem;
+    letter-spacing:0.1em;
+    color:var(--amber);
+  }
+  .card h3{ font-size:1.5rem; margin:8px 0 10px; }
+  .card p{ color:var(--paper-dim); font-size:0.92rem; line-height:1.6; margin:0; }
+
+  .cards-4{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  @media (max-width:900px){ .cards-4{ grid-template-columns:1fr 1fr; } }
+  @media (max-width:560px){ .cards-4{ grid-template-columns:1fr; } }
+  .card-sm{
+    background:var(--panel-2);
+    border:1px solid var(--panel-border);
+    border-radius:var(--radius);
+    padding:18px;
+  }
+  .card-sm .k{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.66rem;
+    color:var(--teal);
+    letter-spacing:0.08em;
+  }
+  .card-sm h3{ font-size:1.18rem; margin:6px 0 8px; text-transform:none; letter-spacing:0; font-family:'IBM Plex Sans',sans-serif; font-weight:600; }
+  .card-sm p{ color:var(--paper-dim); font-size:0.86rem; line-height:1.55; margin:0; }
+
+  /* ---------- worked case ---------- */
+  .case{
+    background:linear-gradient(180deg, rgba(255,182,39,0.035), transparent 40%), var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:14px;
+    padding:36px;
+  }
+  @media (max-width:640px){ .case{ padding:24px 18px; } }
+
+  .case-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:30px;
+    margin-top:26px;
+    align-items:start;
+  }
+  @media (max-width:900px){ .case-grid{ grid-template-columns:1fr; } }
+
+  .steps{ list-style:none; margin:0; padding:0; counter-reset:step; }
+  .steps li{
+    counter-increment:step;
+    position:relative;
+    padding:0 0 22px 40px;
+    border-left:1px solid var(--panel-border);
+    margin-left:12px;
+  }
+  .steps li:last-child{ border-left:1px solid transparent; padding-bottom:0; }
+  .steps li::before{
+    content:counter(step);
+    position:absolute; left:-13px; top:0;
+    width:24px; height:24px;
+    border-radius:50%;
+    background:var(--bg);
+    border:1px solid var(--amber-dim);
+    color:var(--amber);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.72rem;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .steps h4{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-weight:600; text-transform:none; letter-spacing:0;
+    font-size:1.02rem;
+    margin:0 0 6px;
+    color:var(--paper);
+  }
+  .steps p{ margin:0; color:var(--paper-dim); font-size:0.9rem; line-height:1.6; }
+  .steps .tag{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.72rem;
+    color:var(--teal);
+  }
+
+  .result-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-top:26px;
+  }
+  @media (max-width:520px){ .result-row{ grid-template-columns:1fr; } }
+  .result{
+    background:var(--panel-2);
+    border:1px solid var(--panel-border);
+    border-radius:8px;
+    padding:16px 18px;
+  }
+  .result .label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.68rem;
+    color:var(--paper-dim);
+    letter-spacing:0.08em;
+  }
+  .result .value{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:1.5rem;
+    color:var(--amber);
+    margin-top:4px;
+  }
+  .result .value span{ font-size:0.9rem; color:var(--paper-dim); }
+
+  .verify{
+    margin-top:16px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.78rem;
+    color:var(--teal);
+    display:flex; align-items:center; gap:8px;
+  }
+  .verify::before{ content:"✓"; }
+
+  footer{
+    padding:40px 28px 60px;
+    text-align:center;
+    color:var(--paper-dim);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.72rem;
+    letter-spacing:0.04em;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    html{ scroll-behavior:auto; }
+    *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="mark">SMITH<b>·</b>CHART</span>
+  <nav>
+    <a href="#what">What it is</a>
+    <a href="#read">Reading it</a>
+    <a href="#uses">Where it's used</a>
+    <a href="#case">Worked case</a>
+  </nav>
+</div>
+
+<section class="hero">
+  <div class="eyebrow">RF &amp; MICROWAVE ENGINEERING</div>
+  <h1>Impedance,<br>mapped onto <em>a circle.</em></h1>
+  <p class="lede">
+    The Smith chart is the graph RF engineers reach for whenever a signal meets a
+    boundary it doesn't like: an antenna, a connector, an amplifier input. Drag the
+    point below to see how it works, then scroll down for a real matching-network
+    problem worked start to finish.
+  </p>
+
+  <div class="rig">
+    <div class="panel" data-tag="LIVE CHART">
+      <div class="chart-wrap">
+        <svg id="mainChart" viewBox="0 0 520 520" role="img" aria-label="Interactive Smith chart. Drag the teal point to explore impedance values.">
+          <defs>
+            <clipPath id="diskClip1"><circle cx="260" cy="260" r="228"/></clipPath>
+          </defs>
+          <g id="mainGrid"></g>
+        </svg>
+      </div>
+      <div class="chart-caption">
+        <span>Γ-plane · normalized to Z₀</span>
+        <span><b>drag the point</b> to move z = r + jx</span>
+      </div>
+    </div>
+
+    <div class="panel readout" data-tag="READOUT">
+      <div class="status mono" id="status">MISMATCH</div>
+      <dl>
+        <dt>z (norm.)</dt><dd class="mono" id="rd-z">—</dd>
+        <dt>Γ</dt><dd class="mono" id="rd-gamma">—</dd>
+        <dt>∠Γ</dt><dd class="mono" id="rd-angle">—</dd>
+        <dt>VSWR</dt><dd class="mono hl" id="rd-vswr">—</dd>
+      </dl>
+      <p class="hint">
+        <strong>r</strong> is normalized resistance (Z⁄Z₀), <strong>x</strong> is normalized
+        reactance. Γ is the reflection coefficient seen looking into that impedance
+        from a Z₀ line. The center of the chart is a perfect match: z = 1, Γ = 0.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="what">
+  <div class="section-head">
+    <div class="eyebrow">WHAT IT IS</div>
+    <h2>A protractor for reflection.</h2>
+    <p>
+      Every impedance you could plug into a 50&nbsp;Ω line reflects some fraction of
+      the incident signal back toward the source. That fraction is the reflection
+      coefficient, Γ, a complex number with magnitude between 0 and 1. The Smith
+      chart is simply the Γ-plane, with a unit circle boundary, redrawn so that
+      instead of reading off Γ directly you read off the impedance that produced
+      it.
+    </p>
+  </div>
+  <p class="prose">
+    Phillip Smith built it in 1939 as a way to do impedance-to-reflection-coefficient
+    conversions without a slide rule full of complex arithmetic. Two families of
+    circles are overlaid on the Γ-plane: <strong>constant-resistance circles</strong>,
+    all tangent to each other at the open-circuit point, and <strong>constant-reactance
+    arcs</strong>, all radiating from that same point. Find where an r-circle crosses
+    an x-arc and you've found z = r + jx, plotted at the exact spot on the unit disk
+    where its reflection coefficient lives. No calculator required, and every
+    transformation a transmission line or a lumped element performs on that
+    impedance turns into a clean geometric move: a rotation, or a slide along one
+    of those curves.
+  </p>
+</section>
+
+<section id="read">
+  <div class="section-head">
+    <div class="eyebrow">HOW TO READ IT</div>
+    <h2>Three things to find first.</h2>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <div class="k">R = CONST</div>
+      <h3>Resistance circles</h3>
+      <p>Each circle holds one value of normalized resistance r, from r = 0
+      (the outer boundary, a short circuit) to r = ∞ (a single point, the open
+      circuit, at the far right). r = 1 is the circle that passes through
+      dead center, which is why it matters so much for matching.</p>
+    </div>
+    <div class="card">
+      <div class="k">X = CONST</div>
+      <h3>Reactance arcs</h3>
+      <p>Arcs bending toward the top of the chart carry positive, inductive
+      reactance. Arcs bending toward the bottom carry negative, capacitive
+      reactance. The horizontal line through the center is x = 0, purely
+      resistive.</p>
+    </div>
+    <div class="card">
+      <div class="k">|Γ| = 1</div>
+      <h3>The outer boundary</h3>
+      <p>Every point on the rim reflects 100% of the incident signal: a
+      short, an open, or a pure reactance. The closer a point sits to the
+      center, the better matched it is, and the less it reflects.</p>
+    </div>
+  </div>
+</section>
+
+<section id="uses">
+  <div class="section-head">
+    <div class="eyebrow">WHERE IT'S USED</div>
+    <h2>Four everyday jobs.</h2>
+  </div>
+  <div class="cards-4">
+    <div class="card-sm">
+      <div class="k mono">01</div>
+      <h3>Matching networks</h3>
+      <p>Design the inductors, capacitors, or stubs that walk an awkward load
+      impedance back to the center of the chart, where it stops reflecting.</p>
+    </div>
+    <div class="card-sm">
+      <div class="k mono">02</div>
+      <h3>VSWR &amp; return loss</h3>
+      <p>Read |Γ| straight off a point's distance from center, then convert
+      to VSWR or return loss without touching a formula.</p>
+    </div>
+    <div class="card-sm">
+      <div class="k mono">03</div>
+      <h3>Stub tuning</h3>
+      <p>Moving along a length of transmission line rotates a point around
+      the chart's center, which is exactly how open- and short-stub tuners
+      are designed by hand.</p>
+    </div>
+    <div class="card-sm">
+      <div class="k mono">04</div>
+      <h3>Amplifier stability</h3>
+      <p>Stability and gain circles are drawn directly on Smith chart axes
+      to show which source and load impedances keep an amplifier from
+      oscillating.</p>
+    </div>
+  </div>
+</section>
+
+<section id="case">
+  <div class="section-head">
+    <div class="eyebrow">WORKED CASE</div>
+    <h2>Matching a real antenna load.</h2>
+    <p>
+      A monopole antenna feedpoint at 100&nbsp;MHz measures 100&nbsp;+&nbsp;j50&nbsp;Ω.
+      Fed with a 50&nbsp;Ω line, it reflects a meaningful chunk of the transmitter's
+      power back the way it came. Here's the two-element network that fixes it,
+      built entirely by moving along the chart.
+    </p>
+  </div>
+
+  <div class="case">
+    <div class="case-grid">
+      <div class="panel" data-tag="THE PATH" style="padding-top:0;">
+        <div class="chart-wrap">
+          <svg id="caseChart" viewBox="0 0 520 520" role="img" aria-label="Smith chart showing the impedance matching path from the antenna load to the center of the chart.">
+            <defs>
+              <clipPath id="diskClip2"><circle cx="260" cy="260" r="228"/></clipPath>
+            </defs>
+            <g id="caseGrid"></g>
+            <path id="casePath" fill="none" stroke="var(--amber)" stroke-width="2.4" stroke-linecap="round"/>
+            <circle id="caseDot" r="4.4" fill="var(--amber)"></circle>
+            <g id="caseMarkers"></g>
+          </svg>
+        </div>
+        <div class="chart-caption">
+          <span><span style="color:var(--teal)">●</span> load &amp; matched point</span>
+          <span><span style="color:var(--amber)">●</span> after shunt C</span>
+        </div>
+      </div>
+
+      <div>
+        <ol class="steps">
+          <li>
+            <h4>Plot the load</h4>
+            <p><span class="tag">z = 2.00 + j1.00</span><br>
+            100&nbsp;+&nbsp;j50&nbsp;Ω normalized to the 50&nbsp;Ω line. It sits
+            outside the r = 1 circle, reflecting about 45% of incident power.</p>
+          </li>
+          <li>
+            <h4>Add a shunt capacitor at the load</h4>
+            <p><span class="tag">≈ 22.0 pF</span><br>
+            Switching to admittance and adding a shunt susceptance slides the
+            point along a constant-conductance arc until it lands exactly on
+            the r = 1 circle, at z ≈ 1.00 − j1.22.</p>
+          </li>
+          <li>
+            <h4>Cancel what's left with a series inductor</h4>
+            <p><span class="tag">≈ 97.5 nH</span><br>
+            A series reactance rides the r = 1 circle the rest of the way to
+            the center. The remaining reactance disappears; z = 1.00 + j0.00.</p>
+          </li>
+        </ol>
+
+        <div class="result-row">
+          <div class="result">
+            <div class="label mono">SHUNT · AT LOAD</div>
+            <div class="value">22.0 <span>pF</span></div>
+          </div>
+          <div class="result">
+            <div class="label mono">SERIES · TOWARD LINE</div>
+            <div class="value">97.5 <span>nH</span></div>
+          </div>
+        </div>
+        <div class="verify">Re-simulated at 100 MHz: 49.9 + j0.1 Ω into the 50 Ω line</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  BUILT AS AN INTERACTIVE EXPLAINER · ALL VALUES COMPUTED FROM Γ = (z−1)/(z+1)
+</footer>
+
+<script>
+(function(){
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  };
+
+  const R_VALUES = [0.2, 0.5, 1, 2, 5];
+  const X_VALUES = [0.2, 0.5, 1, 2, 5];
+
+  function gammaFromZ(r, x){
+    const denom = (r+1)*(r+1) + x*x;
+    return [ (r*r + x*x - 1)/denom, (2*x)/denom ];
+  }
+  function zFromGamma(u, v){
+    const denom = (1-u)*(1-u) + v*v;
+    return [ (1 - u*u - v*v)/denom, (2*v)/denom ];
+  }
+
+  // ---------- draw the static grid on a given <g>, centered/scaled ----------
+  function drawGrid(g, cx, cy, R, clipId){
+    // outer boundary
+    g.appendChild(el('circle', {cx, cy, r:R, class:'boundary'}));
+
+    // r-circles
+    R_VALUES.forEach(r=>{
+      const cu = r/(1+r), rad = 1/(1+r);
+      const isR1 = r === 1;
+      g.appendChild(el('circle', {
+        cx: cx + cu*R, cy: cy, r: rad*R,
+        class: isR1 ? 'r1-circle' : 'grid-line'
+      }));
+    });
+
+    // x=0 axis
+    g.appendChild(el('line', {x1:cx-R, y1:cy, x2:cx+R, y2:cy, class:'axis-line'}));
+
+    // x-arcs (clipped to disk), both signs
+    const clipped = el('g', {'clip-path': `url(#${clipId})`});
+    X_VALUES.forEach(x=>{
+      [1,-1].forEach(sign=>{
+        const xv = x*sign;
+        const cv = 1/xv, rad = Math.abs(1/xv);
+        clipped.appendChild(el('circle', {
+          cx: cx + R, cy: cy - cv*R, r: rad*R, class:'grid-line dim'
+        }));
+      });
+    });
+    g.appendChild(clipped);
+
+    // r-value axis labels
+    R_VALUES.forEach(r=>{
+      const u = (r-1)/(r+1);
+      const t = el('text', {
+        x: cx + u*R, y: cy + 14, class:'axis-label', 'text-anchor':'middle'
+      });
+      t.textContent = r;
+      g.appendChild(t);
+    });
+
+    // orientation labels
+    const short = el('text', {x:cx-R, y:cy-8, class:'end-label', 'text-anchor':'start'});
+    short.textContent = 'SHORT';
+    g.appendChild(short);
+    const open = el('text', {x:cx+R, y:cy-8, class:'end-label', 'text-anchor':'end'});
+    open.textContent = 'OPEN';
+    g.appendChild(open);
+    const indL = el('text', {x:cx+4, y:cy-R+16, class:'end-label', 'text-anchor':'start'});
+    indL.textContent = '+jx (inductive)';
+    g.appendChild(indL);
+    const capL = el('text', {x:cx+4, y:cy+R-8, class:'end-label', 'text-anchor':'start'});
+    capL.textContent = '−jx (capacitive)';
+    g.appendChild(capL);
+
+    // matched-point crosshair
+    const mark = el('g', {class:'center-mark'});
+    mark.appendChild(el('line', {x1:cx-6, y1:cy, x2:cx+6, y2:cy}));
+    mark.appendChild(el('line', {x1:cx, y1:cy-6, x2:cx, y2:cy+6}));
+    g.appendChild(mark);
+  }
+
+  // ============================================================
+  // MAIN INTERACTIVE CHART
+  // ============================================================
+  const svg1 = document.getElementById('mainChart');
+  const grid1 = document.getElementById('mainGrid');
+  const CX=260, CY=260, RAD=228;
+  drawGrid(grid1, CX, CY, RAD, 'diskClip1');
+
+  const halo = el('circle', {cx:CX, cy:CY, r:9, class:'point-halo'});
+  const point = el('circle', {cx:CX, cy:CY, r:6.5, class:'point', tabindex:'0'});
+  point.setAttribute('role','slider');
+  point.setAttribute('aria-label','Impedance point. Drag to change r and x.');
+  grid1.appendChild(halo);
+  grid1.appendChild(point);
+
+  const rdZ = document.getElementById('rd-z');
+  const rdG = document.getElementById('rd-gamma');
+  const rdA = document.getElementById('rd-angle');
+  const rdV = document.getElementById('rd-vswr');
+  const statusEl = document.getElementById('status');
+
+  function fmt(n){ return (Math.round(n*1000)/1000).toFixed(3).replace('-0.000','0.000'); }
+
+  function updateReadout(u, v){
+    const [r,x] = zFromGamma(u,v);
+    const mag = Math.hypot(u,v);
+    const ang = Math.atan2(v,u) * 180/Math.PI;
+    const vswr = mag >= 0.999 ? '∞' : ((1+mag)/(1-mag)).toFixed(2);
+
+    rdZ.textContent = `${fmt(r)} ${x>=0?'+':'−'} j${fmt(Math.abs(x))}`;
+    rdG.textContent = `${fmt(mag)} ∠${ang.toFixed(1)}°`;
+    rdA.textContent = `${ang.toFixed(1)}°`;
+    rdV.textContent = vswr;
+
+    if (mag < 0.05){ statusEl.textContent='MATCHED'; statusEl.classList.remove('warn'); }
+    else if (mag > 0.9){ statusEl.textContent='NEAR TOTAL REFLECTION'; statusEl.classList.add('warn'); }
+    else { statusEl.textContent = `MISMATCH · VSWR ${vswr}`; statusEl.classList.remove('warn'); }
+  }
+
+  function setPointByGamma(u, v){
+    const mag = Math.hypot(u,v);
+    if (mag > 0.995){ u = u/mag*0.995; v = v/mag*0.995; }
+    const sx = CX + u*RAD, sy = CY - v*RAD;
+    point.setAttribute('cx', sx); point.setAttribute('cy', sy);
+    halo.setAttribute('cx', sx); halo.setAttribute('cy', sy);
+    updateReadout(u, v);
+  }
+
+  // initial position: z = 1.5 - j0.7
+  setPointByGamma(...gammaFromZ(1.5, -0.7));
+
+  let dragging = false;
+  function ptFromEvent(evt){
+    const rect = svg1.getBoundingClientRect();
+    const scale = 520/rect.width;
+    const px = (evt.clientX - rect.left) * scale;
+    const py = (evt.clientY - rect.top) * scale;
+    return [ (px-CX)/RAD, (CY-py)/RAD ];
+  }
+  function startDrag(evt){ dragging = true; point.setPointerCapture && point.setPointerCapture(evt.pointerId); moveDrag(evt); }
+  function moveDrag(evt){
+    if(!dragging) return;
+    const [u,v] = ptFromEvent(evt);
+    setPointByGamma(u,v);
+  }
+  function endDrag(){ dragging = false; }
+
+  point.addEventListener('pointerdown', startDrag);
+  svg1.addEventListener('pointermove', moveDrag);
+  window.addEventListener('pointerup', endDrag);
+  svg1.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
+
+  // basic keyboard support
+  point.addEventListener('keydown', (e)=>{
+    const step = 0.03;
+    const cu = parseFloat(point.getAttribute('cx'));
+    const cv = parseFloat(point.getAttribute('cy'));
+    let u = (cu-CX)/RAD, v = (CY-cv)/RAD;
+    if(e.key==='ArrowLeft') u -= step;
+    else if(e.key==='ArrowRight') u += step;
+    else if(e.key==='ArrowUp') v += step;
+    else if(e.key==='ArrowDown') v -= step;
+    else return;
+    e.preventDefault();
+    setPointByGamma(u,v);
+  });
+
+  // ============================================================
+  // WORKED-CASE CHART
+  // ============================================================
+  const grid2 = document.getElementById('caseGrid');
+  drawGrid(grid2, CX, CY, RAD, 'diskClip2');
+
+  // load: z = 2 + j1  ->  Z0 = 50, ZL = 100 + j50
+  const Z0 = 50, FREQ = 100e6;
+  const rL = 2, xL = 1;
+
+  // y_L = 1 / z_L
+  const denomL = rL*rL + xL*xL;
+  const gL = rL/denomL, bL = -xL/denomL;
+
+  // shunt susceptance to land on g=1... solve (bL+bp)^2 = gL - gL^2
+  const rhs = gL - gL*gL;
+  const rootMag = Math.sqrt(Math.max(rhs,0));
+  const bTotal = rootMag;              // positive branch -> capacitor
+  const bp = bTotal - bL;
+
+  // after shunt: y1 = gL + j*bTotal -> z1
+  const denom1 = gL*gL + bTotal*bTotal;
+  const r1 = gL/denom1, x1 = -bTotal/denom1;
+
+  // series reactance to cancel x1
+  const xs = -x1;
+  const r2 = r1, x2 = x1 + xs; // should be ~0
+
+  // component values
+  const Bp_actual = bp / Z0;                 // Siemens
+  const C_farad = Bp_actual / (2*Math.PI*FREQ);
+  const Xs_actual = xs * Z0;                 // Ohms
+  const L_henry = Xs_actual / (2*Math.PI*FREQ);
+
+  document.querySelector('.result:nth-child(1) .value').innerHTML =
+    (C_farad*1e12).toFixed(1) + ' <span>pF</span>';
+  document.querySelector('.result:nth-child(2) .value').innerHTML =
+    (L_henry*1e9).toFixed(1) + ' <span>nH</span>';
+
+  // build sampled path: load -> (shunt sweep) -> intermediate -> (series sweep) -> center
+  function toScreen([u,v]){ return [CX+u*RAD, CY-v*RAD]; }
+
+  const seg1 = [];
+  const STEPS = 48;
+  for(let i=0;i<=STEPS;i++){
+    const t = i/STEPS;
+    const b = bL + bp*t;
+    const d = gL*gL + b*b;
+    const r = gL/d, x = -b/d;
+    seg1.push(toScreen(gammaFromZ(r,x)));
+  }
+  const seg2 = [];
+  for(let i=0;i<=STEPS;i++){
+    const t = i/STEPS;
+    const x = x1 + xs*t;
+    seg2.push(toScreen(gammaFromZ(r1, x)));
+  }
+
+  const fullPath = seg1.concat(seg2);
+  let d = `M ${fullPath[0][0].toFixed(2)},${fullPath[0][1].toFixed(2)} `;
+  for(let i=1;i<fullPath.length;i++){
+    d += `L ${fullPath[i][0].toFixed(2)},${fullPath[i][1].toFixed(2)} `;
+  }
+  document.getElementById('casePath').setAttribute('d', d);
+
+  // markers
+  const markers = document.getElementById('caseMarkers');
+  function addMarker(zr, zx, color, label, dy){
+    const [u,v] = gammaFromZ(zr,zx);
+    const [sx,sy] = toScreen([u,v]);
+    markers.appendChild(el('circle', {cx:sx, cy:sy, r:5.5, fill:color, stroke:'#0B0E0D', 'stroke-width':1.5}));
+    const t = el('text', {x:sx, y:sy+dy, class:'end-label', 'text-anchor':'middle', fill:color});
+    t.textContent = label;
+    markers.appendChild(t);
+  }
+  addMarker(rL, xL, 'var(--teal)', 'LOAD', -12);
+  addMarker(r1, x1, 'var(--amber)', 'AFTER C', 20);
+  addMarker(1, 0, 'var(--teal)', 'MATCHED', -12);
+
+  // animated dot along the path (respect reduced motion)
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const caseDot = document.getElementById('caseDot');
+  if (!reduce){
+    const anim = el('animateMotion', {dur:'4.5s', repeatCount:'indefinite', rotate:'0'});
+    const mpath = el('mpath', {href:'#casePath'});
+    mpath.setAttributeNS('http://www.w3.org/1999/xlink','href','#casePath');
+    anim.appendChild(mpath);
+    caseDot.appendChild(anim);
+  } else {
+    caseDot.setAttribute('cx', fullPath[fullPath.length-1][0]);
+    caseDot.setAttribute('cy', fullPath[fullPath.length-1][1]);
+  }
+})();
+</script>
+</body>
+</html>
